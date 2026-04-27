@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Devportal Production Architecture — karle047</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  body { margin: 20px; background: #fff; font-family: Arial, sans-serif; }
+  h1 { text-align: center; }
+  h3 { text-align: center; color: #555; margin-top: -10px; }
+  #controls { text-align: center; margin: 10px 0 20px; }
+  button { padding: 10px 24px; font-size: 16px; cursor: pointer; margin: 0 5px; border: 1px solid #333; border-radius: 4px; background: #1976D2; color: #fff; }
+  button:hover { background: #1565C0; }
+</style>
+</head>
+<body>
+<h1>Devportal Production Architecture</h1>
+<h3>Cluster: karle047 &nbsp;|&nbsp; Namespace: production-tenant &nbsp;|&nbsp; GitOps: FluxCD</h3>
+<div id="controls">
+  <button onclick="downloadSVG()">⬇ Download SVG</button>
+  <button onclick="downloadPNG()">⬇ Download PNG</button>
+</div>
+
+<div class="mermaid" id="diagram">
+graph TB
+    subgraph Users["👤 Users"]
+        DEV["Developers / PDUs"]
+        ADMIN["Admins"]
+    end
+
+    subgraph Ingress["🌐 NGINX Ingress Controller"]
+        ING1["devportal.internal.lava.com<br/>TLS · Sticky Sessions · 3000 rps"]
+        ING2["backstage-production.karle047e<br/>TLS · Sticky Sessions · Redirect"]
+    end
+
+    subgraph Portal["🖥️ Devportal — Backstage Platform<br/>eric-csdp-portal:88b724ca · 5 Replicas · HPA 5→30"]
+        direction TB
+
+        subgraph FE["Frontend — React"]
+            CATALOG["Software Catalog"]
+            SELFSERVICE["Self-Service Templates"]
+            TECHDOCS["TechDocs"]
+            SEARCH["Search"]
+            PAGES["Org & Project Pages"]
+            DASHBOARD["My Dashboard"]
+        end
+
+        subgraph Integrations["Integration Plugins"]
+            FYC["Follow Your Commit & Microservice"]
+            JIRA["Jira Dashboard"]
+            GERRIT["Gerrit & GitLab"]
+            JENKINS["Jenkins"]
+            JFROG["JFrog Artifactory"]
+            SONAR["SonarQube"]
+            OPENGROK["OpenGrok"]
+        end
+
+        subgraph AI["AI & Intelligence"]
+            AIMKT["AI Marketplace"]
+            AIPROMPT["AI Prompts"]
+            AGENTHUB["AgentHub"]
+            GLEAN["Glean Chatbot"]
+            CTX["Context Retrieval"]
+        end
+
+        subgraph Governance["Governance & Quality"]
+            AES["AES Compliance"]
+            RENOVATE["Renovate Dashboard"]
+            SWFRESH["SW Freshness / CVE"]
+            PERMS["RBAC Permissions"]
+            FEEDBACK["Feedback"]
+        end
+
+        subgraph BackendCore["Backend Core — Port 7007"]
+            AUTH["Auth Engine — LDAP + Microsoft SSO<br/>+ Dynamic Client Registration"]
+            CATENGINE["Catalog Engine — 12+ Processors"]
+            SCAFFENGINE["Scaffolder Engine — 15+ Action Modules"]
+            SEARCHENGINE["Search Engine"]
+            NOTIFICATIONS["Notifications & Subscriptions"]
+            ANALYTICS["Entity Analytics & Matomo"]
+        end
+
+        subgraph Sidecar["🔐 Vault Agent Sidecar"]
+            VAULT_AGENT["HashiCorp Vault Agent<br/>30+ secrets injected<br/>Path: backstage-production/global/*"]
+        end
+    end
+
+    subgraph Data["💾 Data Layer"]
+        subgraph PGPOOL["PgBouncer Connection Pooler<br/>5 Replicas · HPA 5→60"]
+            POOLER["pgbouncer:1.23.0<br/>1 CPU / 512Mi → 2 CPU / 1Gi"]
+        end
+        subgraph CNPG["CloudNativePG Cluster<br/>PostgreSQL 17 · 3 Instances · HA"]
+            PG_PRIMARY[("Primary<br/>cnpg-recover-cluster-1<br/>100Gi RBD · 12 CPU · 12Gi")]
+            PG_STANDBY1[("Standby 3<br/>100Gi RBD · 12 CPU · 12Gi")]
+            PG_STANDBY2[("Standby 4<br/>100Gi RBD · 12 CPU · 12Gi")]
+        end
+        REDIS[("Redis Cache<br/>redis-headless-mtls.redis.svc:6379")]
+        S3[("S3 / MinIO<br/>serois3obj.sero.gic.lava.se<br/>TechDocs · Scaffolder · Assets")]
+        SHARED[("NFS PVC<br/>backstage-shared · 1Gi")]
+    end
+
+    subgraph Backup["📦 Backup — Barman"]
+        S3BACKUP[("S3: cnpg-backups/karle047<br/>WAL + Data · gzip · 60d retention")]
+    end
+
+    subgraph External["🌐 External Services"]
+        LDAP_SVC["LDAP — User & Group Sync"]
+        AZURE_SVC["Microsoft Azure AD"]
+        GERRIT_GAMMA["Gerrit Gamma"]
+        GERRIT_BETA["Gerrit Beta"]
+        GERRIT_EPK["Gerrit EPK"]
+        GERRIT_lava["Gerrit lava"]
+        GITLAB_SVC["GitLab Internal"]
+        JIRA_SVC["Jira"]
+        JENKINS_SVC["Jenkins"]
+        JFROG_SELI["JFrog ARM SELI"]
+        JFROG_SERO["JFrog ARM SERO"]
+        SPINNAKER_SVC["Spinnaker"]
+        OPENSEARCH_SVC["OpenSearch"]
+        SONAR_SVC["SonarQube"]
+        GLEAN_SVC["Glean API<br/>everyday-assistant.lava.net"]
+        AI_SVC["EricAI / Ray<br/>ray.sero.gic.lava.se"]
+        AES_SVC["AES / GAD Compliance"]
+        MATOMO_SVC["Matomo Analytics"]
+        OPENGROK_SVC["OpenGrok"]
+        CONFLUENCE_SVC["Confluence"]
+    end
+
+    subgraph GitOps["⚙️ FluxCD GitOps"]
+        FLUX["Kustomization: production-tenant<br/>Branch: main<br/>Reconciled: f8ad3ee1"]
+    end
+
+    DEV --> Ingress
+    ADMIN --> Ingress
+    ING1 --> Portal
+    ING2 --> Portal
+
+    BackendCore --> POOLER
+    POOLER --> PG_PRIMARY
+    PG_PRIMARY --> PG_STANDBY1
+    PG_PRIMARY --> PG_STANDBY2
+    PG_PRIMARY --> S3BACKUP
+
+    BackendCore --> REDIS
+    BackendCore --> S3
+    BackendCore --> SHARED
+
+    AUTH --> LDAP_SVC
+    AUTH --> AZURE_SVC
+    CATENGINE --> GERRIT_GAMMA
+    CATENGINE --> GITLAB_SVC
+    CATENGINE --> LDAP_SVC
+    FYC --> GERRIT_GAMMA
+    FYC --> JENKINS_SVC
+    FYC --> SPINNAKER_SVC
+    FYC --> JFROG_SELI
+    FYC --> OPENSEARCH_SVC
+    JIRA --> JIRA_SVC
+    GERRIT --> GERRIT_GAMMA
+    GERRIT --> GERRIT_BETA
+    GERRIT --> GERRIT_EPK
+    GERRIT --> GERRIT_lava
+    GERRIT --> GITLAB_SVC
+    JENKINS --> JENKINS_SVC
+    JFROG --> JFROG_SELI
+    JFROG --> JFROG_SERO
+    SONAR --> SONAR_SVC
+    GLEAN --> GLEAN_SVC
+    AIMKT --> AI_SVC
+    CTX --> AI_SVC
+    AES --> AES_SVC
+    ANALYTICS --> MATOMO_SVC
+    OPENGROK --> OPENGROK_SVC
+    SCAFFENGINE --> S3
+    SCAFFENGINE --> GERRIT_GAMMA
+    TECHDOCS --> S3
+    NOTIFICATIONS --> CONFLUENCE_SVC
+
+    FLUX -.->|manages| Portal
+    FLUX -.->|manages| Data
+    VAULT_AGENT -.->|injects secrets| BackendCore
+</div>
+
+<script>
+mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose',
+  flowchart: { useMaxWidth: false, htmlLabels: true, curve: 'basis' }
+});
+
+function downloadSVG() {
+  const svg = document.querySelector('#diagram svg');
+  const data = new XMLSerializer().serializeToString(svg);
+  const blob = new Blob([data], { type: 'image/svg+xml' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'devportal-production-architecture.svg';
+  a.click();
+}
+
+function downloadPNG() {
+  const svg = document.querySelector('#diagram svg');
+  const data = new XMLSerializer().serializeToString(svg);
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  const img = new Image();
+  img.onload = function() {
+    canvas.width = img.width * 2;
+    canvas.height = img.height * 2;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.scale(2, 2);
+    ctx.drawImage(img, 0, 0);
+    const a = document.createElement('a');
+    a.href = canvas.toDataURL('image/png');
+    a.download = 'devportal-production-architecture.png';
+    a.click();
+  };
+  img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(data)));
+}
+</script>
+</body>
+</html>
