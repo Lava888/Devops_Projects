@@ -1,0 +1,62 @@
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+terraform.tfvars
+local.tfvars
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Kubernetes
+*.kubeconfig
+.kube/
+
+# Docker
+*.dockerfile
+docker-compose.override.yml
+.dockerignore
+
+# General DevOps
+*.log
+*.backup
+*.swp
+*.swo
+*~
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# CI/CD
+.github/workflows/*.tmp
+.gitlab-ci.local.yml
+
+# Secrets and credentials
+.env
+.env.local
+*.pem
+*.key
+*.crt
+secrets.yaml
+.secrets
+config.local.yaml
+
+# Build artifacts
+build/
+dist/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+venv/
+env/
+.venv
